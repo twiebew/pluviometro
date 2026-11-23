@@ -387,7 +387,7 @@ const HISTORIAL_INICIAL = "\"Gauge Name\",\"Notes\",\"Max\",\"Color\",\"Gauge ID
    ============================================================ */
 
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const MODO_VISTA = typeof window !== 'undefined' && window.__VISTA__ === true;
 const TZ = 'America/Asuncion';
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -2070,6 +2070,7 @@ async function fbFetch(url, opciones, esAuth) {
     const clave = String(crudo).split(' ')[0].split(':')[0];
     let msg = ERRORES_AUTH[clave] || crudo;
     if (/API key not valid|API_KEY_INVALID/i.test(crudo)) msg = 'La clave de API (apiKey) no es válida.';
+    if (/Transaction too big|too large|exceeds the maximum/i.test(crudo)) msg = 'Envío demasiado grande; se reintentará en partes.';
     if (!esAuth && (r.status === 404 || /does not exist|NOT_FOUND/i.test(crudo))) msg = 'No se encontró la base Firestore. Créela en la consola de Firebase (Firestore Database › Crear base de datos).';
     if (!esAuth && (r.status === 403 || /PERMISSION_DENIED|insufficient permissions/i.test(crudo))) msg = /has not been used|disabled/i.test(crudo) ? 'Firestore no está habilitado en el proyecto. Cree la base de datos en la consola.' : 'Permiso denegado: publique las reglas de seguridad indicadas en Ajustes.';
     const err = new Error(msg); err.status = r.status; throw err;
@@ -2129,7 +2130,18 @@ async function fsPost(sufijo, cuerpo) {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(cuerpo),
   });
 }
-async function fsCommit(escrituras) { if (escrituras.length) await fsPost(rutaBD() + ':commit', { writes: escrituras }); }
+async function fsCommit(escrituras) {
+  if (!escrituras.length) return;
+  try { await fsPost(rutaBD() + ':commit', { writes: escrituras }); }
+  catch (e) {
+    // Si Firebase rechaza el tamaño, se divide el envío en mitades
+    if (/demasiado grande/.test(e.message) && escrituras.length > 1) {
+      const m = Math.ceil(escrituras.length / 2);
+      await fsCommit(escrituras.slice(0, m));
+      await fsCommit(escrituras.slice(m));
+    } else throw e;
+  }
+}
 function escritura(col, id, datos) {
   return { update: { name: nombreDoc(col, id), fields: camposFS(datos) }, updateTransforms: [{ fieldPath: 'srv', setToServerValue: 'REQUEST_TIME' }] };
 }
@@ -2169,7 +2181,8 @@ async function sincronizar(opts) {
         for (const d of docs) {
           if (d.srv && (!maxSrv || d.srv > maxSrv)) maxSrv = d.srv;
           if (def.mensual) {
-            const filas = d.filas || {};
+            let filas = d.filas || {};
+            if (typeof d.datos === 'string') { try { filas = JSON.parse(d.datos); } catch (e) { filas = {}; } }
             for (const clave in filas) {
               const [fecha, fuente] = clave.split('|');
               const id = d.estacion_id + '|' + fecha + '|' + fuente;
@@ -2204,7 +2217,7 @@ async function sincronizar(opts) {
     };
     const agregar = async (w, t, ids) => {
       const peso = JSON.stringify(w).length;
-      if (lote.length >= 400 || tam + peso > 3500000) await vaciarLote();
+      if (lote.length && (lote.length >= 60 || tam + peso > 700000)) await vaciarLote();
       lote.push(w); tam += peso; limpiar.push([t, ids]);
     };
     for (const t of ['estaciones', 'registros']) {
@@ -2227,7 +2240,7 @@ async function sincronizar(opts) {
         const [est, m] = [k.slice(0, k.lastIndexOf('|')), k.slice(k.lastIndexOf('|') + 1)];
         const mapa = {};
         for (const o of filas) { const v = {}; for (const c of def.campos) v[c] = o[c] === undefined ? null : o[c]; mapa[o.fecha + '|' + o.fuente] = v; }
-        await agregar(escritura(def.col, k, { estacion_id: est, mes: m, filas: mapa }), t, filas.filter(o => o._dirty).map(o => o.id));
+        await agregar(escritura(def.col, k, { estacion_id: est, mes: m, datos: JSON.stringify(mapa) }), t, filas.filter(o => o._dirty).map(o => o.id));
         res.subidos += filas.filter(o => o._dirty).length;
       }
     }

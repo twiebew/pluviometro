@@ -1,6 +1,6 @@
 /* Service worker – Registro Pluviométrico
    Guarda la aplicación para uso sin conexión. Nunca toca los datos del usuario (IndexedDB). */
-const VERSION = 'pluvio-1.1.0';
+const VERSION = 'pluvio-1.1.1';
 const ARCHIVOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

@@ -1,0 +1,23 @@
+{
+  "id": "./",
+  "name": "Registro Pluviométrico",
+  "short_name": "Pluviómetro",
+  "description": "Registro de lluvias con historial climático de múltiples fuentes, reportes comparativos y respaldo en la nube.",
+  "lang": "es-PY",
+  "start_url": "./#inicio",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f3ef",
+  "theme_color": "#1f3b57",
+  "categories": ["weather", "productivity", "utilities"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Registrar lluvia", "short_name": "Registrar", "url": "./#registrar", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Reportes", "url": "./#reportes", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+  ]
+}
